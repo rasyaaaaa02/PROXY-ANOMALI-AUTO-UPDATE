@@ -325,7 +325,7 @@ local payload = [[
       "fields": [
         {
           "name": "📄 Executed Script:",
-          "value": "**<:rightarrow:1366771662476804096> PROXY ANOMALI HELPER [V1.0.2]**\n"
+          "value": "**<:rightarrow:1366771662476804096> PROXY ANOMALI HELPER []]..UpdateVersion..[[]**\n"
         },
         {
           "name": "⚜️ Executed By:",
