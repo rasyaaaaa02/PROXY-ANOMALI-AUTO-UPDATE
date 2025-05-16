@@ -1,0 +1,2368 @@
+local UpdateVersion = "V 1.0.3"
+local UpdateDateVersion = "10-5-2025"
+
+local localPlayer = GetLocal()
+local world = GetWorld()
+local cleanName = string.gsub(localPlayer.name, "[%d`]", "")
+local posX = string.format("%.0f", localPlayer.pos.x / 32)
+local posY = string.format("%.0f", localPlayer.pos.y / 32)
+
+function removeColorAndSymbols(str)
+    local cleanedStr = string.gsub(str, "`(%S)", '')
+    cleanedStr = string.gsub(cleanedStr, "`{2}|(~{2})", '')
+    cleanedStr = string.gsub(cleanedStr, "%s*%b()", "")
+    return cleanedStr
+  end
+  
+local now = os.time()
+local local_time = os.date("*t", now)
+local utc_time = os.date("!*t", now)
+
+local offset = os.difftime(os.time(local_time), os.time(utc_time))
+local jam_offset = offset / 3600
+
+local zona = ""
+if jam_offset == 7 then
+    zona = "WIB (GMT+7) - Indonesian"
+elseif jam_offset == 8 then
+    zona = "WITA (GMT+8) - Indonesian"
+elseif jam_offset == 9 then
+    zona = "WIT (GMT+9) - Indonesian"
+else
+    local prefix = jam_offset >= 0 and "+" or "-"
+    zona = string.format("Outside Indonesian (UTC%s%d)", prefix, math.abs(jam_offset))
+end
+
+local nama_hari = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" }
+local nama_bulan = { "January", "February", "March", "April", "May", "June", 
+                     "July", "August", "September", "October", "November", "December" }
+
+local hari = nama_hari[local_time.wday]
+local bulan = nama_bulan[local_time.month]
+
+local jam = local_time.hour
+local am_pm = "AM"
+if jam >= 12 then
+    am_pm = "PM"
+    if jam > 12 then jam = jam - 12 end
+elseif jam == 0 then
+    jam = 12
+end
+
+local tanggal = string.format("%s, %02d %s %04d", hari, local_time.day, bulan, local_time.year)
+local waktu_str = string.format("%02d:%02d:%02d %s", jam, local_time.min, local_time.sec, am_pm)
+
+local droplog = droplog or ""
+local collectlog = collectlog or ""
+local spinlog = spinlog or ""
+
+-- ImGUI
+local droplogImGui = droplogImGui or ""
+local DropXLogBlueGL = DropXLogBlueGL or ""
+local DropXLogBlackGL = DropXLogBlackGL or ""
+
+PullDelayViewInv = false
+
+function SendWebhook(url, data)
+    coroutine.wrap(function()
+        pcall(function()
+            MakeRequest(url, "POST", {
+                ["Content-Type"] = "application/json"
+            }, data)
+        end)
+    end)()
+end
+
+local function buttonBack()
+    return "\nadd_spacer|small|\nadd_button|link_back|`cBack|"
+end
+
+local function BackLog()
+    return "\nadd_spacer|small|\nadd_button|link_log_back|`6Back|"
+end
+
+function proxyDialog()
+    local player = GetLocal()
+
+    if not player or not GetWorld() then
+        return
+    end
+
+    local name = player.name or "Unknown Name"
+    local userid = player.userid or 0
+    local netid = player.netid or 0
+
+    local posx = 0
+    local posy = 0
+    if player.pos then
+        posx = player.pos.x or 0
+        posy = player.pos.y or 0
+        posx = math.floor(posx / 32)
+        posy = math.floor(posy / 32)
+    end
+
+    local world = (GetWorld() and GetWorld().name) or "Unknown World"
+
+    local proxy = [[
+add_image_button|banner|interface/large/ANOMALI_SCRIPT.rttex|bannerlayout||
+add_spacer|small|
+add_label_with_icon|big|`cProxy Helper ANOMALI|left|9236|
+add_spacer|small|
+add_textbox|`9Script created by: `5@Rangti|
+add_smalltext|`9Proxy Version: `2]]..UpdateVersion..[[|
+add_smalltext|`9Thank you for choosing the `2PROXY ANOMALI BOTHAX `9script!|
+add_smalltext|`9This script is completely `4free `9please `4do not `9attempt to sell or monetize it.|
+add_spacer|small|
+add_label_with_icon|small|`5Information's|left|2330|
+add_smalltext|`9Username: ]]..name..[[ `b- `9UserID: `1]]..userid..[[ `b- `9NetID: `1]]..netid..[[|
+add_smalltext|`9Position X: `1]]..posx..[[ `b- `9Y: `1]]..posy..[[|
+add_smalltext|`9Current World: `1]]..world..[[|
+add_spacer|small|
+add_textbox|`2Enjoy using all the features in this script!|
+add_button_with_icon|socialfriend|`1Social Friend|staticBlueFrame|1366|
+add_button_with_icon|commandlist|`9Command List|staticYellowFrame|2916|
+add_button_with_icon|wrenchmode|`9Wrench Page|staticYellowFrame|14534|
+add_button_with_icon|camera|`9Camera Log|staticYellowFrame|1436|
+add_button_with_icon||END_LIST|noflags|0|
+add_quick_exit|
+end_dialog|proxy_dialog_end|`bClosed||
+text_scaling_string|HolyCOWS|
+]]
+    SendVariantList({ [0] = "OnDialogRequest", [1] = proxy })
+end
+
+function command_list()
+    local ed = "`5[ `2enable `b/ `4disable `5]"
+    local command = [[
+add_label_with_icon|big|`9Command List|left|2916|
+add_spacer|small|
+add_label_with_icon|small|`1Main Command :|left|4940|
+add_smalltext|`9Command > `#/proxy `5( `0Open the Proxy Helper Dialog `5)|
+add_smalltext|`9Command > `#/cmd `5( `0Open the Command List Dialog `5)|
+add_smalltext|`9Command > `#/wr `5( `0Open the Wrench Dialog to Select `5)|
+add_smalltext|`9Command > `#/sdb `5( `0Super Duper Boardcast Blocked `5) ]]..ed..[[|
+add_smalltext|`9Command > `#/res `5( `0Fast Respawn `5)|
+add_smalltext|`9Command > `#/relog `5( `0Fast Relog `5)|
+add_smalltext|`9Command > `#/exit `5( `0Fast EXIT The World `5)|
+add_smalltext|`9Command > `#/champ `5( `2Purchase `0Champagne via Telephone, Buy Used `eBGL `6(only 1 BGL) `0Manually use `6Wrench `5) ]]..ed..[[|
+add_smalltext|`9Command > `#/cbgl `5( `0Fast `cConvert `0Telephone `3DL `0to `eBGL `0Manually use `6Wrench `5) ]]..ed..[[|
+
+add_spacer|small|
+add_textbox|`1Chat :|
+add_smalltext|`9Command > `#/prefix1 `5( `0Prefix Chat With A Random Color and Growmoji `5) ]]..ed..[[|
+add_smalltext|`9Command > `#/prefix2 `5( `0Prefix Chat With A Random Color `5) ]]..ed..[[|
+add_smalltext|`9Command > `#/dchat `5( `0Show Drop Chat for Lock At Chat `5) ]]..ed..[[|
+add_smalltext|`9Command > `#/cchat `5( `0Show Collect Chat for Lock At Chat `5) ]]..ed..[[|
+add_spacer|small|
+add_textbox|`1Modal :|
+add_smalltext|`9Command > `#/modal `5( `0Show Modal Lock At Chat `5)|
+add_smalltext|`9Command > `#/pmodal `5( `0Show a lock modal for the player and also display it in chat `5) ]]..ed..[[|
+add_smalltext|`9Command > `#/pbmodal `5( `0Show a `eBGL `0and `bBGL `0modal + pull the player to the location, and display the action in chat `5) ]]..ed..[[|
+add_spacer|small|
+add_label_with_icon|small|`1Drop Command :|left|11550|
+add_smalltext|`9Command > `#/dw `6<amount> `5( `0Drop `9World Lock `5)|
+add_smalltext|`9Command > `#/dd `6<amount> `5( `0Drop `3Diamond Lock `5)|
+add_smalltext|`9Command > `#/db `6<amount> `5( `0Drop `eBlue Gem Lock `5)|
+add_smalltext|`9Command > `#/dg `6<amount> `5( `0Drop `bBlack Gem Lock `5)|
+add_spacer|small|
+add_label_with_icon|small|`2[NEW] `1Drop X Command :|left|11550|
+add_smalltext|`9Command > `#/dbx3 `6<amount> `5( `0Drop x3 `eBlue Gem Lock `5)|
+add_smalltext|`9Command > `#/dbx4 `6<amount> `5( `0Drop x4 `eBlue Gem Lock `5)|
+add_smalltext|`9Command > `#/dbx5 `6<amount> `5( `0Drop x5 `eBlue Gem Lock `5)|
+add_smalltext|`9Command > `#/dbx6 `6<amount> `5( `0Drop x6 `eBlue Gem Lock `5)|
+add_smalltext|`9Command > `#/dbx7 `6<amount> `5( `0Drop x7 `eBlue Gem Lock `5)|
+add_spacer|small|
+add_smalltext|`9Command > `#/bbx3 `6<amount> `5( `0Drop x3 `bBlack Gem Lock `5)|
+add_smalltext|`9Command > `#/bbx4 `6<amount> `5( `0Drop x4 `bBlack Gem Lock `5)|
+add_smalltext|`9if you're not strong anymore, and want to `5play big`9, you can use this `1command `5drop X`9, if you're already too hot :V|
+add_spacer|small|
+add_label_with_icon|small|`1Wrench Command :|left|32|
+add_smalltext|`9Command > `#/w pull `5( `2Enable `0Wrench to Pick a `cPull Mode `5)|
+add_smalltext|`9Command > `#/w kick `5( `2Enable `0Wrench to Pick a `cKick Mode `5)|
+add_smalltext|`9Command > `#/w ban `5( `2Enable `0Wrench to Pick a `cBan Mode `5)|
+add_smalltext|`9Command > `#/w off `5( `0Any Wrench Mode that is still `2Enabled `0under `6(`^Pull `b/ `^Kick `b/ `^Ban`6) `0will be `4Disabled `5)|
+add_spacer|small|
+add_label_with_icon|small|`1Wrench Command :|left|32|
+add_smalltext|`9Command > `#/reme `5( `0Show Spin To Pick a `cReme Mode `5)|
+add_smalltext|`9Command > `#/qeme `5( `0Show Spin To Pick a `cQeme Mode `5)|
+add_smalltext|`9Command > `#/leme `5( `0Show Spin To Pick a `cLeme Mode `5)|
+add_spacer|small|
+add_label_with_icon|small|`2[NEW] `1Skin Command :|left|3774|
+add_smalltext|`9Command > `#/skin `5( `0Change your skin's appearance to its `ooriginal `0appearance `5)|
+add_smalltext|`9Command > `#/s black `5( `0Changes your skin appearance to `bblack `5)|
+add_smalltext|`9Command > `#/s white `5( `0Changes your skin appearance to `7white `5)|
+add_smalltext|`9Command > `#/s red `5( `0Changes your skin appearance to `4red `5)|
+add_smalltext|`9Command > `#/s green `5( `0Changes your skin appearance to `2green `5)|
+add_smalltext|`9Command > `#/s blue `5( `0Changes your skin appearance to `eblue `5)|
+add_smalltext|`9Command > `#/s yellow `5( `0Changes your skin appearance to `9yellow `5)|
+add_smalltext|`9Command > `#/s purple `5( `0Changes your skin appearance to `#purple `5)|
+add_smalltext|`9Command > `#/s pink `5( `0Changes your skin appearance to `ppink `5)|
+add_smalltext|`9Oh, to change Skin it will get a `510 second `9delay, `1except `9for the `c/skin `9command|
+add_spacer|small|
+add_label_with_icon|small|`1BGL Command :|left|7188|
+add_smalltext|`9Command > `#/wd `6<Amount> `5( `0Withdraw `eBlue Gem Locks `0to the `eBank BGL `5)|
+add_smalltext|`9Command > `#/dp `6<Amount> `5( `0Deposit `eBlue Gem Locks `0into the `eBank BGL `5)|
+add_smalltext|`9Command > `#/blue `5( `0Convert `51 `bBlack Gem Lock `0to `5100 `eBlue Gem Locks `5)|
+add_smalltext|`9Command > `#/black `5( `0Convert `5100 `eBlue Gem Locks `0to `51 `bBlack Gem Lock `5)|
+add_spacer|small|
+add_label_with_icon|small|`2[NEW] `1Spam Command :|left|1354|
+add_smalltext|`9Command > `#/setspam `6<text> `5( `0Set the `5Spam Text `0that will be `2repeatedly sent `5)|
+add_smalltext|`9Command > `#/spam `5( `5Automatic `0Spamming if text for spam has been `2set `5)|
+add_spacer|small|
+]] ..buttonBack().. [[
+]]
+    SendVariantList({ [0] = "OnDialogRequest", [1] = command })
+end
+
+function camera_log()
+    clog = [[
+add_label_with_icon|big|`9Camera Log|left|1436|
+add_spacer|small|
+add_button|droplog|`1Drop Log|left|
+add_button|collectlog|`1Collect Log|left|
+add_button|spinlog|`1Spin Log|left|
+]] ..buttonBack().. [[
+]]
+    SendVariantList({ [0] = "OnDialogRequest", [1] = clog })
+end
+
+function droppedlog() 
+    local dlog = [[
+add_label_with_icon|big|`1Drop Log|left|11550|
+add_spacer|small|
+]] .. (_G.droplog or "") .. [[
+add_spacer|small|
+]] .. ((BackLog and BackLog()) or "") .. [[
+]]
+    SendVariantList({ [0] = "OnDialogRequest", [1] = dlog })
+end
+
+function collectedlog()
+    local clog = [[
+add_label_with_icon|big|`1Collect Log|left|11550|
+add_spacer|small|
+]] .. (_G.collectlog or "") .. [[
+add_spacer|small|
+]] .. ((BackLog and BackLog()) or "") .. [[
+]]
+    SendVariantList({ [0] = "OnDialogRequest", [1] = clog })
+end
+local systemNAme = "`c[ `#ANOMALI `c]"
+function spinnedlog()
+    local slog = [[
+add_label_with_icon|big|`1Spin Log|left|758|
+add_spacer|small|
+]] .. (_G.spinlog or "") .. [[
+add_spacer|small|
+]] .. ((BackLog and BackLog()) or "") .. [[
+]]
+    SendVariantList({ [0] = "OnDialogRequest", [1] = slog })
+end
+
+local sdb = false
+local cbgl = false
+local champ = false
+local dropchat = false
+local collectchat = false
+local prefixchat = false
+local spam = false
+local prefixrainbowchat = false
+local wrenchpull = false
+local wrenchkick = false
+local wrenchban = false
+local wrenchdefault = false
+local rememode = false
+local qememode = false
+local lememode = false
+
+local pmodal = pmodal or false
+local pbmodal = pbmodal or false
+
+function log(txt)
+    var = {}
+    var[0] = "OnConsoleMessage"
+    var[1] = systemNAme .. " `9" .. txt
+    SendVariantList(var)
+end
+
+function overlay(txt)
+    var = {}
+    var[0] = "OnTextOverlay"
+    var[1] = systemNAme .. " `9" .. txt
+    SendVariantList(var)
+end
+
+function send(txt)
+    SendPacket(2, "action|input\n|text|" ..systemNAme .. " `9" .. txt .."")
+end
+
+function warn(txt)
+    var = {}
+    var[0] = "OnAddNotification"
+    var[1] = "interface/atomic_button.rttex"
+    var[2] = systemNAme .. " `9" .. txt
+    var[3] = "audio/hub_open.wav"
+    SendVariantList(var)
+end
+
+local world = GetWorld()
+
+if world and world.name then
+local WebHook = "https://discordapp.com/api/webhooks/1366742348146409472/G7GWF8DKq8pcyA3o1SrH4wTIg5NxW1-wRstdwLguN9qHRbZ5I_J0UvuYotv8pAMkD4--mc"
+local WebHookFake = "https://discordapp.com/api/webhooks/1369588633744707604/criPqPVEvqF1uwI8n1J15pvAgR0F25pV-2poNepF4Fmnc2haU6FIqjgw8x9zipbUvtyy"
+
+local payload = [[
+{
+  "content": null,
+  "embeds": [
+    {
+      "description": "",
+      "color": 6749185,
+      "fields": [
+        {
+          "name": "📄 Executed Script:",
+          "value": "**<:rightarrow:1366771662476804096> PROXY ANOMALI HELPER [V1.0.2]**\n"
+        },
+        {
+          "name": "⚜️ Executed By:",
+          "value": "**<:rightarrow:1366771662476804096> ]] .. removeColorAndSymbols(GetLocal().name) .. [[**\n"
+        },
+        {
+          "name": "<:DEProfile:1367767923925585992> UserID & NetID:",
+          "value": "**<:rightarrow:1366771662476804096> ]] .. GetLocal().userid .. [[ **&** ]] .. GetLocal().netid .. [[**"
+        },
+        {
+          "name": "<:WorldLock:1367767887099596910> Current World:",
+          "value": "**<:rightarrow:1366771662476804096> ]] .. GetWorld().name .. [[**"
+        },
+        {
+          "name": "<:VGClock:1367763578937151518> Execution Time:",
+          "value": "**<:rightarrow:1366771662476804096> zone: ]] .. zona .. [[**\n**<:rightarrow:1366771662476804096> ]] .. tanggal .. [[ **&** <:rightarrow:1366771662476804096> ]] .. waktu_str .. [[**"
+        }
+      ]
+    }
+  ],
+  "attachments": []
+}
+]]
+
+Sleep(40)
+SendWebhook(WebHook, payload)
+warn("Thanks For Using this `2PROXY!!")
+send("`bProxy BY ANOMALI")
+Sleep(500)
+-- SiH ImGui
+
+local wrenchOptions = {"Wrench Off", "Wrench Pull", "Wrench Kick", "Wrench Ban"}
+local selectedWrenchIndex = 1
+
+local function update_wrench(index)
+    wrenchdefault = (index == 1)
+    wrenchpull = (index == 2)
+    wrenchkick = (index == 3)
+    wrenchban = (index == 4)
+end
+
+function custom_menu()
+    if ImGui.Begin("PROXY ANOMALI HELPER's (Creative-PS)") then
+        if ImGui.BeginTabBar("MainTabs") then
+
+            -- Lobby Tab
+            if ImGui.BeginTabItem("Lobby") then
+                ImGui.Text("Proxy Version:")
+                ImGui.SameLine()
+                ImGui.TextColored(ImVec4(0.0, 1.0, 0.2, 1.0), UpdateVersion)
+                ImGui.Spacing()
+
+                ImGui.TextColored(ImVec4(1.0, 1.0, 0.0, 1.0), "Script created by:")
+                ImGui.SameLine()
+                ImGui.TextColored(ImVec4(1.0, 0.4, 1.0, 1.0), "@Rangti")
+
+                ImGui.Spacing()
+                ImGui.Text("Thank you for choosing the")
+                ImGui.SameLine()
+                ImGui.TextColored(ImVec4(0.0, 1.0, 0.0, 1.0), "PROXY ANOMALI BOTHAX")
+                ImGui.SameLine()
+                ImGui.Text("script!")
+                ImGui.Text("This script is completely")
+                ImGui.SameLine()
+                ImGui.TextColored(ImVec4(1.0, 0.0, 0.0, 1.0), "free")
+                ImGui.SameLine()
+                ImGui.Text("please")
+                ImGui.SameLine()
+                ImGui.TextColored(ImVec4(1.0, 0.0, 0.0, 1.0), "do not")
+                ImGui.SameLine()
+                ImGui.Text("sell or monetize it.")
+
+                ImGui.Spacing()
+                ImGui.Separator()
+                ImGui.TextColored(ImVec4(0.4, 1.0, 0.0, 1.0), ">> User Info")
+
+                ImGui.Text("Username:")
+                ImGui.SameLine()
+                ImGui.TextColored(ImVec4(1.0, 0.8, 0.0, 1.0), cleanName)
+
+                ImGui.Text("UserID:")
+                ImGui.SameLine()
+                ImGui.TextColored(ImVec4(1.0, 0.8, 0.0, 1.0), tostring(localPlayer.userid))
+
+                ImGui.Text("NetID:")
+                ImGui.SameLine()
+                ImGui.TextColored(ImVec4(1.0, 0.8, 0.0, 1.0), tostring(localPlayer.netid))
+
+                ImGui.Text("Position X:")
+                ImGui.SameLine()
+                ImGui.TextColored(ImVec4(1.0, 0.8, 0.0, 1.0), posX)
+                ImGui.SameLine()
+                ImGui.Text("Y:")
+                ImGui.SameLine()
+                ImGui.TextColored(ImVec4(1.0, 0.8, 0.0, 1.0), posY)
+
+                ImGui.Text("Current World:")
+                ImGui.SameLine()
+                ImGui.TextColored(ImVec4(1.0, 0.8, 0.0, 1.0), world.name)
+                ImGui.EndTabItem()
+            end
+
+            -- Update Log Tab
+            function ShowUpdateLog(logTitle, logType)
+                if logType == "added" then
+                    ImGui.TextColored(ImVec4(0.0, 1.0, 0.0, 1.0), "[+]")
+                elseif logType == "info" then
+                    ImGui.TextColored(ImVec4(0.0, 0.5, 1.0, 1.0), "[?]")
+                elseif logType == "fixed" then
+                    ImGui.TextColored(ImVec4(0.7, 0.7, 0.0, 1.0), "[^]")
+                elseif logType == "update" then
+                    ImGui.TextColored(ImVec4(0.9, 0.8, 0.0, 1.0), "[*]")
+                elseif logType == "upgrade" then
+                    ImGui.TextColored(ImVec4(1.0, 0.5, 0.0, 1.0), "[!]")
+                end
+
+                ImGui.SameLine()
+                ImGui.TextColored(ImVec4(3.0, 1.0, 0.0, 1.0), "~>")
+                ImGui.SameLine()
+                ImGui.TextColored(ImVec4(3.5, 0.9, 0.2, 1.0), logTitle)
+            end
+
+            if ImGui.BeginTabItem("Update") then
+                if ImGui.BeginTabBar("UpdateTabs") then
+                    if ImGui.BeginTabItem("" .. UpdateVersion .. " (" .. UpdateDateVersion .. ")") then
+
+                        local avail = ImGui.GetContentRegionAvail()
+                        ImGui.BeginChild("UpdateLogScroll", ImVec2(avail.x, avail.y), true, ImGui.WindowFlags.HorizontalScrollbar)
+
+                        if ImGui.BeginTabBar("LanguageTabs") then
+                            if ImGui.BeginTabItem("English") then
+                                ShowUpdateLog("Add Logs to ImGui for better tracking", "added")
+                                ShowUpdateLog("Add Introduced BTK Menu in ImGui for enhanced customization", "added")
+                                ShowUpdateLog("Fixed an issue where the fast wheel would incorrectly reappear after switching accounts or relogging", "fixed")
+                                ShowUpdateLog("Added player/self modal display in ImGui with commands /modal - /pmodal", "added")
+                                ShowUpdateLog("Added player modal display on BGL in ImGui with command /pbmodal", "added")
+                                ShowUpdateLog("Fixed a bug in the player modal display so that each player now has a distinct appearance, including their modal inventory.", "fixed")
+                                ShowUpdateLog("Upgrade webhook will execute based on WIB/WITA/WIT timezone detection to determine the player's\ngeographic location distinguishing between users within Indonesia and those outside the country", "upgrade")
+                                ShowUpdateLog("Fixed Webhook on Fake Spun, will be sent directly to the Discord", "fixed")
+                                ImGui.EndTabItem()
+                            end
+
+                            if ImGui.BeginTabItem("Indonesia") then
+                                ShowUpdateLog("Menambahkan log di ImGui untuk pelacakan yang lebih baik", "added")
+                                ShowUpdateLog("Menambahkan menu BTK di ImGui untuk penyesuaian lebih lanjut", "added")
+                                ShowUpdateLog("Memperbaiki masalah di mana fast wheel muncul kembali setelah ganti akun atau relogin", "fixed")
+                                ShowUpdateLog("Menambahkan tampilan modal pemain / diri sendiri di ImGui dan untuk Command menggunakan /modal - /pmodal", "added")
+                                ShowUpdateLog("Menambahkan tampilan modal pemain pada BGL di ImGui dan untuk Command menggunakan /pbmodal", "added")
+                                ShowUpdateLog("Memperbaiki bug tampilan modal pemain agar setiap pemain memiliki tampilan yang berbeda, termasuk inventaris modalnya", "fixed")
+                                ShowUpdateLog("Webhook ditingkatkan agar dijalankan berdasarkan deteksi zona waktu WIB/WITA/WIT untuk menentukan\nlokasi geografis pemain memisahkan pengguna di dalam dan luar Indonesia", "upgrade")
+                                ShowUpdateLog("Memperbaiki pengiriman Webhook pada Fake Spun, sekarang langsung dikirim ke Discord", "fixed")
+                                ImGui.EndTabItem()
+                            end
+                            ImGui.EndTabBar()
+                        end
+
+                        ImGui.EndChild()
+                        ImGui.EndTabItem()
+                    end
+                    ImGui.EndTabBar()
+                end
+                ImGui.EndTabItem()
+            end
+
+            if ImGui.BeginTabItem("All Menu") then
+                local avail = ImGui.GetContentRegionAvail()
+                local halfWidth = avail.x * 0.5
+
+                -- Child 1
+                ImGui.BeginChild("LeftPanel", ImVec2(halfWidth - 5, avail.y), true, ImGui.WindowFlags.HorizontalScrollbar)
+                
+                -- Main 
+                ImGui.TextColored(ImVec4(0.0, 1.2, 1.5, 1.0), "-- Main --")
+                ImGui.BeginGroup()
+
+                if ImGui.Checkbox("Prefix 1", prefixchat) then
+                    prefixchat = not prefixchat
+                    prefixrainbowchat = false
+                end
+
+                ImGui.SameLine()
+                ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 55)
+
+                if ImGui.Button("My Modal") then
+                    local wl, dl, bgl, bbgl = inv(242), inv(1796), inv(7188), inv(11550)
+                    send("`1My Modal: `9WL: `5"..wl.." `3DL: `5"..dl.." `eBGL: `5"..bgl.." `bBGL: `5"..bbgl)
+                end
+
+                if ImGui.Checkbox("Prefix 2", prefixrainbowchat) then
+                    prefixrainbowchat = not prefixrainbowchat
+                    prefixchat = false
+                end
+
+                ImGui.SameLine()
+                ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 55)
+
+                if ImGui.Checkbox("Blocked SDB", sdb) then
+                    sdb = not sdb
+                end
+
+                if ImGui.Checkbox("Drop Chat", dropchat) then
+                    dropchat = not dropchat
+                end
+
+                ImGui.SameLine()
+                ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 48)
+
+                if ImGui.Checkbox("Show Player Modal", pmodal) then
+                    pmodal = not pmodal
+                    pbmodal = false
+                end
+
+                if ImGui.Checkbox("Collect Chat", collectchat) then
+                    collectchat = not collectchat
+                end
+
+                ImGui.SameLine()
+                ImGui.SetCursorPosX(ImGui.GetCursorPosX() + 25)
+
+                if ImGui.Checkbox("Show Modal + Pull Player", pbmodal) then
+                    pbmodal = not pbmodal
+                    pmodal = false
+                end
+
+                if ImGui.Checkbox("Champagne", champ) then
+                    champ = not champ
+                    cbgl = false
+                end
+
+                if ImGui.Checkbox("Change BGL", cbgl) then
+                    cbgl = not cbgl
+                    champ = false
+                end
+
+                ImGui.EndGroup()
+                ImGui.Separator()
+
+                -- Mode
+                ImGui.TextColored(ImVec4(0.0, 1.2, 1.5, 1.0), "-- Mode --")
+                ImGui.BeginGroup()
+
+                if ImGui.Checkbox("Reme Mode", rememode) then
+                    rememode = not rememode
+                    qememode = false
+                    Lememode = false
+                end
+
+                if ImGui.Checkbox("Qeme Mode", qememode) then
+                    qememode = not qememode
+                    rememode = false
+                    Lememode = false
+                end
+
+                if ImGui.Checkbox("Leme Mode", lememode) then
+                    lememode = not lememode
+                    rememode = false
+                    qememode = false
+                end
+
+                ImGui.Spacing()
+                ImGui.Text("Wrench:")
+                ImGui.PushItemWidth(-1)
+                if ImGui.BeginCombo("##Wrench", wrenchOptions[selectedWrenchIndex]) then
+                    for i = 1, #wrenchOptions do
+                        local is_selected = (selectedWrenchIndex == i)
+                        if ImGui.Selectable(wrenchOptions[i], is_selected) then
+                            selectedWrenchIndex = i
+                            update_wrench(i)
+                        end
+                        if is_selected then
+                            ImGui.SetItemDefaultFocus()
+                        end
+                    end
+                    ImGui.EndCombo()
+                end
+                ImGui.PopItemWidth()
+                ImGui.EndGroup()
+
+                ImGui.EndChild()
+
+                ImGui.SameLine()
+
+                -- Child 2
+                ImGui.BeginChild("RightPanel", ImVec2(halfWidth - 5, avail.y), true, ImGui.WindowFlags.HorizontalScrollbar)
+
+                -- Actions
+                ImGui.TextColored(ImVec4(0.0, 1.2, 1.5, 1.0), "-- Actions --")
+                ImGui.BeginGroup()
+
+                if ImGui.Button("Respawn") then
+                    SendPacket(2, "action|respawn")
+                end
+
+                if ImGui.Button("Exit World") then
+                    SendPacket(3, "action|join_request\nname|EXIT\ninvitedWorld|0")
+                end
+
+                if ImGui.Button("Relog World") then
+                    local save_world_to_relog = GetWorld().name
+                    SendPacket(3, "action|join_request\nname|"..save_world_to_relog.."\ninvitedWorld|0")
+                end
+
+                ImGui.EndGroup()
+                ImGui.Separator()
+
+                -- Dialogs
+                ImGui.TextColored(ImVec4(0.0, 1.2, 1.5, 1.0), "-- Dialogs --")
+                ImGui.BeginGroup()
+
+                if ImGui.Button("Proxy") then 
+                    proxyDialog() 
+                end
+
+                if ImGui.Button("Command List") then 
+                    command_list() 
+                end
+
+                if ImGui.Button("Wrench Page") then 
+                    wrench() 
+                end
+
+                ImGui.EndGroup()
+                ImGui.EndChild()
+
+                ImGui.EndTabItem()
+            end
+
+
+            -- BTK
+            if ImGui.BeginTabItem("BTK Menu") then
+                ImGui.Text("Coming Soon...")
+                ImGui.EndTabItem()
+            end
+
+            -- Logs
+            if ImGui.BeginTabItem("Logs") then
+                if ImGui.BeginTabBar("LogsTabs") then
+
+                    -- Dropped Logs Tab
+                    if ImGui.BeginTabItem("Dropped Logs") then
+                        if ImGui.BeginChild("DroppedLogsChild", ImVec2(0, 400), true) then
+                            if ImGui.BeginTabBar("DropLogTabs") then
+
+                                if ImGui.BeginTabItem("Not Drop X") then
+                                    _G.droplogImGui = _G.droplogImGui or {}
+
+                                    local function getItemColor(item)
+                                        local colorMap = {
+                                            [" World Lock"] = ImVec4(1.0, 0.9, 0.2, 1.0),
+                                            [" Diamond Lock"] = ImVec4(0.5, 1.0, 1.0, 1.0),
+                                            [" Blue Gem Lock"] = ImVec4(0.2, 0.7, 1.0, 1.0),
+                                            [" Black Gem Lock"] = ImVec4(0.5, 0.5, 0.5, 1.0),
+                                        }
+                                        return colorMap[item] or ImVec4(1.0, 0.85, 0.0, 1.0)
+                                    end
+
+                                    for _, log in ipairs(_G.droplogImGui) do
+                                        ImGui.TextColored(ImVec4(0.4, 0.9, 0.6, 1.0), "[" .. log.waktu .. "]")
+                                        ImGui.SameLine(nil, 1)
+                                        ImGui.TextColored(ImVec4(1.0, 0.2, 0.2, 1.0), log.drop)
+                                        ImGui.SameLine(nil, 1)
+                                        ImGui.TextColored(ImVec4(1.0, 1.0, 1.0, 1.0), log.count)
+                                        ImGui.SameLine(nil, 1)
+                                        ImGui.TextColored(getItemColor(log.item), log.item)
+                                    end
+                                    ImGui.EndTabItem()
+                                end
+
+                                if ImGui.BeginTabItem("Drop X") then
+                                    _G.DropXLogBlueGL = _G.DropXLogBlueGL or {}
+                                    _G.DropXLogBlackGL = _G.DropXLogBlackGL or {}
+
+                                    local function getItemColorBlueGL(item)
+                                        return ImVec4(0.2, 0.7, 1.0, 1.0)
+                                    end
+
+                                    local function getItemColorBlackGL(item)
+                                        return ImVec4(0.5, 0.5, 0.5, 1.0)
+                                    end
+
+                                    local function DropXColor(item)
+                                        local map = {
+                                            [" Dropped X3 "] = ImVec4(1.0, 0.2, 0.2, 1.0),
+                                            [" Dropped X4 "] = ImVec4(1.0, 0.2, 0.2, 1.0),
+                                            [" Dropped X5 "] = ImVec4(1.0, 0.2, 0.2, 1.0),
+                                            [" Dropped X6 "] = ImVec4(1.0, 0.2, 0.2, 1.0),
+                                            [" Dropped X7 "] = ImVec4(1.0, 0.2, 0.2, 1.0)
+                                        }
+                                        return map[item] or ImVec4(1.0, 0.85, 0.0, 1.0)
+                                    end
+
+                                    for i = #_G.DropXLogBlueGL, 1, -1 do
+                                        local log = _G.DropXLogBlueGL[i]
+                                        if type(log) == "table" then
+                                            ImGui.TextColored(ImVec4(0.4, 0.9, 0.6, 1.0), "[" .. tostring(log.waktu or "??:??") .. "]")
+                                            ImGui.SameLine(nil, 1)
+                                            ImGui.TextColored(DropXColor(log.dropX), tostring(log.dropX or "??"))
+                                            ImGui.SameLine(nil, 1)
+                                            ImGui.TextColored(ImVec4(1.0, 0.8, 0.0, 1.0), tostring(log.symbol1 or ""))
+                                            ImGui.SameLine(nil, 1)
+                                            ImGui.TextColored(ImVec4(0.0, 1.2, 1.5, 1.0), tostring(log.count or "0"))
+                                            ImGui.SameLine(nil, 1)
+                                            ImGui.TextColored(ImVec4(1.0, 0.8, 0.0, 1.0), tostring(log.symbol2 or ""))
+                                            ImGui.SameLine(nil, 1)
+                                            ImGui.TextColored(ImVec4(1.0, 1.0, 1.0, 1.0), tostring(log.totalCount or "0"))
+                                            ImGui.SameLine(nil, 1)
+                                            ImGui.TextColored(getItemColorBlueGL(log.item), tostring(log.item or "Unknown"))
+                                        end
+                                    end
+
+                                    for i = #_G.DropXLogBlackGL, 1, -1 do
+                                        local log = _G.DropXLogBlackGL[i]
+                                        if type(log) == "table" then
+                                            ImGui.TextColored(ImVec4(0.4, 0.9, 0.6, 1.0), "[" .. tostring(log.waktu or "??:??") .. "]")
+                                            ImGui.SameLine(nil, 1)
+                                            ImGui.TextColored(DropXColor(log.dropX), tostring(log.dropX or "??"))
+                                            ImGui.SameLine(nil, 1)
+                                            ImGui.TextColored(ImVec4(1.0, 0.8, 0.0, 1.0), tostring(log.symbol1 or ""))
+                                            ImGui.SameLine(nil, 1)
+                                            ImGui.TextColored(ImVec4(0.0, 1.2, 1.5, 1.0), tostring(log.count or "0"))
+                                            ImGui.SameLine(nil, 1)
+                                            ImGui.TextColored(ImVec4(1.0, 0.8, 0.0, 1.0), tostring(log.symbol2 or ""))
+                                            ImGui.SameLine(nil, 1)
+                                            ImGui.TextColored(ImVec4(1.0, 1.0, 1.0, 1.0), tostring(log.totalCount or "0"))
+                                            ImGui.SameLine(nil, 1)
+                                            ImGui.TextColored(getItemColorBlackGL(log.item), tostring(log.item or "Unknown"))
+                                        end
+                                    end
+                                    ImGui.EndTabItem()
+                                end
+
+                                ImGui.EndTabBar()
+                            end
+                            ImGui.EndChild()
+                        end
+                        ImGui.EndTabItem()
+                    end
+
+                    -- Collected Logs Tab
+                     if ImGui.BeginTabItem("Collected Logs") then
+                        if ImGui.BeginChild("CollectedLogsChild", ImVec2(0, 0), true) then
+                            _G.collectedLogs = _G.collectedLogs or {}
+
+                            if #_G.collectedLogs == 0 then
+                                ImGui.Text("No collected locks in the world (YourSelf)")
+                            else
+                                for _, log in ipairs(_G.collectedLogs) do
+                                    ImGui.Text(log)
+                                end
+                            end
+                        end
+                        ImGui.EndChild()
+                        ImGui.EndTabItem()
+                    end
+
+                    -- Roulette Logs Tab
+                    if ImGui.BeginTabItem("Roulette Logs") then
+                        if ImGui.BeginChild("RouletteLogsChild", ImVec2(0, 0), true) then
+                            _G.rouletteLogs = _G.rouletteLogs or {}
+
+                            if #_G.rouletteLogs == 0 then
+                                ImGui.Text("No roulette wheel logs available.")
+                            else
+                                for _, log in ipairs(_G.rouletteLogs) do
+                                    ImGui.Text(log)
+                                end
+                            end
+                        end
+                        ImGui.EndChild()
+                        ImGui.EndTabItem()
+                    end
+
+                    ImGui.EndTabBar()
+                end
+                ImGui.EndTabItem()
+            end
+        end
+        ImGui.End()
+    end
+end
+AddHook("ondraw", "custom_menu", custom_menu)
+
+
+function inv(id)
+	for _, inv in pairs(GetInventory()) do
+		if inv.id == id then
+			return inv.amount
+		end
+	end
+	return 0
+end
+
+function drop(dropID, dropAmount)
+    SendPacket(2,"action|dialog_return\ndialog_name|drop\nitem_drop|" .. dropID .. "|\nitem_count|" .. dropAmount .. "")
+end
+
+function dlock(id, id2, amount)
+    for _, inv in pairs(GetInventory()) do
+        if inv.id == id then
+            if inv.amount < amount then
+                SendPacketRaw(false, { type = 10, value = id2 })
+            end
+        end
+    end
+end
+
+function wear(id)
+    SendPacketRaw(false, { type = 10, value = id })
+end
+
+function PlayerName(id)
+    for _, player in pairs(GetPlayerList()) do
+        if player.netid == tonumber(id) then
+            return player.name
+        end
+    end
+end
+
+function getColor(num)
+    local number = tonumber(num)
+    if not number then return "" end
+
+    if number == 0 then
+        return "`2"
+    elseif number % 2 == 0 then
+        return "`b"
+    else
+        return "`4"
+    end
+end
+
+function remove_color_codes(str)
+    pattern = "`."
+    result = string.gsub(str, pattern, "")
+    return result
+end
+
+function qq_function(number)
+    number = tonumber(number) or 0
+
+    local last_digit = number % 10
+
+    if number == 0 then
+        return "1 `4LOSE (cry)", false
+    elseif last_digit == 0 then
+        return "0 `c3X (shamrock)", false
+    elseif last_digit == 1 then
+        return "1 `4LOSE (cry)", false
+    else
+        return tostring(last_digit), false
+    end
+end
+
+function reme_function(number)
+    local str_number = tostring(number)
+    local sum = 0
+
+    for i = 1, #str_number do
+        sum = sum + tonumber(str_number:sub(i, i))
+    end
+
+    local str_sum = tostring(sum)
+    local last_digit = str_sum:sub(-1)
+    local result = tonumber(last_digit)
+
+    if result == 0 then
+        return "0 `c3X (shamrock)"
+    elseif result == 1 then
+        return "1 `4LOSE (cry)"
+    else
+        return result
+    end
+end
+
+function leme_function(number)
+    local str_number = tostring(number)
+    local sum = 0
+
+    for i = 1, #str_number do
+        sum = sum + tonumber(str_number:sub(i, i))
+    end
+
+    if number == 19 or number == 28 or number == 0 then
+        sum = 0
+    elseif number == 29 or number == 10 or number == 1 then
+        sum = 1
+    elseif number == 9 or number == 36 or number == 27 or number == 18 then
+        sum = 9
+    end
+
+    if sum == 0 then
+        sum = 0
+    end
+
+    local str_sum = tostring(sum)
+    local last_digit = tonumber(str_sum:sub(-1))
+    local result = tonumber(last_digit)
+
+    if result == 0 then
+        return "0 `24X (nuke)"
+    elseif result == 1 then
+        return "1 `c3X (shamrock)"
+    elseif result == 9 then
+        return "9 `4LOSE (cry)"
+    else
+        return result
+    end
+end
+
+function wrench()
+    local wrenchMode = "add_label_with_icon|big|`9Wrench Page|left|32|\nadd_spacer|small|\n"
+
+    local wrenchPullState = wrenchpull or false
+    local wrenchKickState = wrenchkick or false
+    local wrenchBanState  = wrenchban or false
+
+    local pullColor = wrenchPullState and "`9" or "`5"
+    local pullFrame = wrenchPullState and "staticYellowFrame" or "staticPurpleFrame"
+    local kickColor = wrenchKickState and "`9" or "`5"
+    local kickFrame = wrenchKickState and "staticYellowFrame" or "staticPurpleFrame"
+    local banColor  = wrenchBanState  and "`9" or "`5"
+    local banFrame  = wrenchBanState  and "staticYellowFrame" or "staticPurpleFrame"
+
+    local defaultColor = "`4"
+    local defaultLabel = "   Disable   "
+
+    if wrenchPullState or wrenchKickState or wrenchBanState then
+        local currentMode = wrenchPullState and "`5Pull Mode"
+                        or wrenchKickState and "`5Kick Mode"
+                        or wrenchBanState and "`5Ban Mode"
+        wrenchMode = wrenchMode .. "add_smalltext|`9Wrench Mode is `2Enabled `9and set to: " .. currentMode .. "|\n"
+    else
+        wrenchMode = wrenchMode .. "add_smalltext|`9Wrench Mode is `4Disabled|\n" ..
+                     "add_spacer|small|\n" .. "add_textbox|`9Click a button to `2Enable a Mode|\n"
+    end
+
+    wrenchMode = wrenchMode ..
+        "add_button_with_icon|pullmode|" .. pullColor .. "   Pull Mode   |" .. pullFrame .. "|14534|\n" ..
+        "add_button_with_icon|kickmode|" .. kickColor .. "   Kick Mode   |" .. kickFrame .. "|14534|\n" ..
+        "add_button_with_icon|banmode|" .. banColor .. "   Ban Mode   |" .. banFrame .. "|14534|\n"
+
+    if wrenchPullState or wrenchKickState or wrenchBanState then
+        wrenchMode = wrenchMode .. "add_button_with_icon|defaultmode|" .. defaultColor .. defaultLabel .. "|left|170|\n"
+    end
+
+    wrenchMode = wrenchMode .. "add_button_with_icon||END_LIST|noflags|0|\n"
+    wrenchMode = wrenchMode .. buttonBack()
+
+    SendVariantList({ [0] = "OnDialogRequest", [1] = wrenchMode })
+end
+
+AddHook("onsendpacket", "main", function(type, str)
+
+    if str:find("/proxy") then
+        proxyDialog()
+        return true
+    end
+
+    if str:find("/cmd") then
+        command_list()
+        return true
+    end
+
+    if str:find("buttonClicked|link_back") then
+        proxyDialog()
+        return true
+    end
+
+    if str:find("buttonClicked|link_log_back") or str:find("buttonClicked|camera") then
+        camera_log()
+        return true
+    end
+
+    if str:find("buttonClicked|droplog") then
+        droppedlog() 
+        return true
+    end
+
+    if str:find("buttonClicked|collectlog") then
+        collectedlog()
+        return true
+    end
+
+    if str:find("buttonClicked|spinlog") then
+        spinnedlog()
+        return true
+    end
+
+    if str:find("action|friend") then
+        proxyDialog()
+        return true 
+    end
+
+    if str:find("buttonClicked|commandlist") then
+        command_list()
+        return true
+    end
+    
+    if str:find("/wr") or str:find("buttonClicked|wrenchmode") then
+        wrench()
+        return true
+    end
+    
+    if str:find("buttonClicked|socialfriend") then
+        SendPacket(2, "action|dialog_return\ndialog_name|social\nbuttonClicked|back")
+    end
+
+    if str:find("/setspam (.+)") then
+        local text = str:match("/setspam (.+)")
+        SendPacket(2, "action|input\ntext|/setspam " .. text)
+        return true
+    end
+
+    if str:find("/sdb") then
+        sdb = not sdb 
+        local status = (sdb and "`2Enabled" or "`4Disabled")
+        log("SDB "..status)
+        overlay("SDB "..status)
+        return true
+    end
+    
+    if str:find("/spam") then
+        if not spam then
+            SendPacket(2, "action|dialog_return\ndialog_name|cheats\ncheck_autospam|1")
+            overlay("Spam Chat `2Enable")
+            spam = true
+        else
+            SendPacket(2, "action|dialog_return\ndialog_name|cheats\ncheck_autospam|0")
+            overlay("Spam Chat `4Disable")
+            spam = false
+        end
+        return true
+    end
+
+    local growmojiRandom = {
+        "sigh", "mad", "smile", "tongue", "wow", "no", "shy", "wink", "music", "lol", "yes", "love",
+        "megaphone", "heart", "cool", "kiss", "agree", "see-no-evil", "dance", "build", "oops", "sleep",
+        "punch", "bheart", "cry", "party", "wl", "grow", "gems", "gtoken", "plead", "vend", "bunny",
+        "cactus", "peace", "terror", "troll", "halo", "nuke", "pine", "football", "fireworks", "song",
+        "ghost", "evil", "pizza", "alien", "clap", "turkey", "gift", "cake", "heartarrow", "shamrock",
+        "grin", "ill", "eyes", "weary", "moyai"
+    }
+
+    local colorRandom = {
+        "`0", "`1", "`2", "`3", "`4", "`5", "`6", "`7", "`8", "`9", "`w", "`o", "`p", "`b", "`q", "`e", "`r", "`t", "`a", "`s", "`c", "`!", "`@", "`#", "`$", "`^", "`&"
+    }
+
+    if str:find("action|input\n|text|/prefix1") then
+        prefixchat = not prefixchat
+        prefixrainbowchat = false
+        log("Prefix Chat " .. (prefixchat and "`2Enabled" or "`4Disabled"))
+        overlay("Prefix Chat " .. (prefixchat and "`2Enabled" or "`4Disabled"))
+        return true
+    end
+
+    if str:find("/res") then
+        SendPacket(2, "action|respawn")
+        return true
+    end
+
+    if str:find("/exit") then
+        SendPacket(3, "action|join_request\nname|EXIT\ninvitedWorld|0")
+        return true
+    end
+
+    if str:find("/relog") then
+        local save_world_to_relog = GetWorld().name
+            SendPacket(3, "action|join_request\nname|"..save_world_to_relog.."\ninvitedWorld|0")
+        return true
+    end
+
+    if str:find("action|input\n|text|/prefix2") then
+        prefixrainbowchat = not prefixrainbowchat
+        prefixchat = false
+        log("Prefix V2 Chat " .. (prefixrainbowchat and "`2Enabled" or "`4Disabled"))
+        overlay("Prefix V2 Chat " .. (prefixrainbowchat and "`2Enabled" or "`4Disabled"))
+        return true
+    end
+
+    if str:find("action|input\n|text|/cchat") then
+        collectchat = not collectchat
+        local status = (collectchat and "`2Enable" or "`4Disable")
+        log("Collected Chat "..status)
+        overlay("Collected Chat "..status)
+        return true
+    end
+    
+    if str:find("action|input\n|text|/dchat") then
+        dropchat = not dropchat
+        local status = (dropchat and "`2Enable" or "`4Disable")
+        log("Dropped Chat "..status)
+        overlay("Dropped Chat "..status)
+        return true
+    end
+
+    if str:find("/cbgl") then
+        cbgl = not cbgl
+        local status = (cbgl and "`2Enable" or "`4Disable")
+        champ = false
+        log("Change BGL "..status)
+        overlay("Change BGL "..status)
+        return true
+    end
+
+    if str:find("/champ") then
+        champ = not champ
+        local status = (champ and "`2Enable" or "`4Disable")
+        cbgl = false
+        log("Buy Champagne "..status)
+        overlay("Buy Champagne "..status)
+        return true
+    end
+
+    if str:find("/modal") then
+        local wl = inv(242)
+        local dl = inv(1796)
+        local bgl = inv(7188)
+        local bbgl = inv(11550)
+
+        send("`1My Modal: `9WL: `5"..wl.." `3DL: `5"..dl.." `eBGL: `5"..bgl.." `bBGL: `5"..bbgl)
+        return true
+    end
+        
+    if prefixchat and str:find("action|input\n|text|") then
+        local Random_Growmoji = growmojiRandom[math.random(#growmojiRandom)]
+        local Random_Color = colorRandom[math.random(#colorRandom)]
+    
+        local neeker = str:match("|text|([^|\n]+)")
+    
+        if neeker:find("/") then
+            return false
+    
+        elseif neeker:find("spun the wheel and got %d+") then
+            local name, number = neeker:match("^(%a[%w_]*) spun the wheel and got (%d+)")
+            if name and number then
+                return false
+            end
+    
+        else
+            SendPacket(2, "action|input\n|text|(" .. Random_Growmoji .. ") `b : " .. Random_Color .. neeker)
+            return true
+        end
+    end
+
+if prefixrainbowchat and str:find("action|input\n|text|") then
+    local Random_Color = colorRandom[math.random(#colorRandom)]
+    
+        local neeker = str:match("|text|([^|\n]+)")
+    
+        if neeker:find("/") then
+            return false
+    
+        elseif neeker:find("spun the wheel and got %d+") then
+            local name, number = neeker:match("^(%a[%w_]*) spun the wheel and got (%d+)")
+            if name and number then
+                return false
+            end
+    
+        else
+            SendPacket(2, "action|input\n|text|" .. Random_Color .. neeker)
+            return true
+        end
+    end
+    
+    return false
+end)
+
+AddHook("onsendpacket", "change skin", function(type, str)
+
+    if str:find("/skin") then
+        SendPacket(2, "action|setSkin\ncolor|3370516479")
+        return true
+    end
+
+    if str:find("/s black") then
+        SendPacket(2, "action|dialog_return\ndialog_name|skinpicker\nred|0\ngreen|0\nblue|0\ntransparency|0")
+        return true
+    elseif str:find("/s white") then
+        SendPacket(2, "action|dialog_return\ndialog_name|skinpicker\nred|255\ngreen|255\nblue|255\ntransparency|0")
+        return true
+    elseif str:find("/s red") then
+        SendPacket(2, "action|dialog_return\ndialog_name|skinpicker\nred|255\ngreen|0\nblue|0\ntransparency|0")
+        return true
+    elseif str:find("/s green") then
+        SendPacket(2, "action|dialog_return\ndialog_name|skinpicker\nred|0\ngreen|255\nblue|0\ntransparency|0")
+        return true
+    elseif str:find("/s blue") then
+        SendPacket(2, "action|dialog_return\ndialog_name|skinpicker\nred|0\ngreen|0\nblue|255\ntransparency|0")
+        return true
+    elseif str:find("/s yellow") then
+        SendPacket(2, "action|dialog_return\ndialog_name|skinpicker\nred|255\ngreen|255\nblue|0\ntransparency|0")
+        return true
+    elseif str:find("/s purple") then
+        SendPacket(2, "action|dialog_return\ndialog_name|skinpicker\nred|128\ngreen|0\nblue|128\ntransparency|0")
+        return true
+    elseif str:find("/s pink") then
+        SendPacket(2, "action|dialog_return\ndialog_name|skinpicker\nred|255\ngreen|182\nblue|193\ntransparency|0")
+        return true
+    end
+
+    return false
+end)
+AddHook("onsendpacket", "csn", function(type, str)
+    
+    if str:find("action|input\n|text|/dw (%d+)") then
+        local amount = str:match("action|input\n|text|/dw (%d+)")
+        local c = tonumber(amount)
+        
+        if c == 0 then
+            log("`4Drop Amount cannot be `00`4.")
+            return true
+        end
+    
+        if c > 250 then
+            log("`4Drop `cLimit exceeded`4. Max allowed is `0250`4.")
+            return true
+        end
+    
+        drop(242, c)
+        local logtext = "\nadd_smalltext|`r[`3" .. os.date("%H:%M:%S") .. "`r] `4Dropped `0" .. c .. " `9World Lock|left|"
+        
+        if not _G.droplog then
+            _G.droplog = ""
+        end
+        _G.droplog = logtext .. _G.droplog
+
+        if not _G.droplogImGui then
+            _G.droplogImGui = {}
+        end
+
+        local waktuDrop = os.date("%H:%M:%S")
+        local count = tostring(c)
+
+        table.insert(_G.droplogImGui, 1, {
+            waktu = waktuDrop,
+            drop = " Dropped ",
+            count = count,
+            item = " World Lock"
+        })
+    
+        log("`4Dropped `0" .. c .. " `9World Lock")
+    
+        if dropchat then
+            send("`4Dropped `0" .. c .. " `9World Lock")
+        end
+    
+        return true
+    end    
+
+    if str:find("action|input\n|text|/dd (%d+)") then
+        local amount = str:match("action|input\n|text|/dd (%d+)")
+        local c = tonumber(amount)
+        
+        if c == 0 then
+            log("`4Drop Amount cannot be `00`4.")
+            return true
+        end
+        
+        if c > 250 then
+            log("`4Drop `cLimit exceeded`4. Max allowed is `0250`4.")
+            return true
+        end
+        
+
+        drop(1796, c)
+        local logtext = "\nadd_smalltext|`r[`3" .. os.date("%H:%M:%S") .. "`r] `4Dropped `0" .. c .. " `3Diamond Lock|left|"
+    
+        if not _G.droplog then
+            _G.droplog = ""
+        end
+        _G.droplog = logtext .. _G.droplog
+
+        if not _G.droplogImGui then
+            _G.droplogImGui = {}
+        end
+
+        local waktuDrop = os.date("%H:%M:%S")
+        local count = tostring(c)
+
+        table.insert(_G.droplogImGui, 1, {
+            waktu = waktuDrop,
+            drop = " Dropped ",
+            count = count,
+            item = " Diamond Lock"
+        })
+
+        log("`4Dropped `0" .. c .. " `3Diamond Lock")
+        if dropchat then
+            send("`4Dropped `0" .. c .. " `3Diamond Lock")
+        end
+        return true
+    end
+
+    if str:find("action|input\n|text|/db (%d+)") then
+        local amount = str:match("action|input\n|text|/db (%d+)")
+        local c = tonumber(amount)
+        
+        if c == 0 then
+            log("`4Drop Amount cannot be `00`4.")
+            return true
+        end
+        
+        if c > 250 then
+            log("`4Drop `cLimit exceeded`4. Max allowed is `0250`4.")
+            return true
+        end
+        
+
+        drop(7188, c)
+        local logtext = "\nadd_smalltext|`r[`3" .. os.date("%H:%M:%S") .. "`r] `4Dropped `0" .. c .. " `eBlue Gem Lock|left|"
+    
+        if not _G.droplog then
+            _G.droplog = ""
+        end
+        _G.droplog = logtext .. _G.droplog
+
+        if not _G.droplogImGui then
+            _G.droplogImGui = {}
+        end
+
+        local waktuDrop = os.date("%H:%M:%S")
+        local count = tostring(c)
+
+        table.insert(_G.droplogImGui, 1, {
+            waktu = waktuDrop,
+            drop = " Dropped ",
+            count = count,
+            item = " Blue Gem Lock"
+        })
+
+        log("`4Dropped `0" .. c .. " `eBlue Gem Lock")
+        if dropchat then
+            send("`4Dropped `0" .. c .. " `eBlue Gem Lock")
+        end
+        return true
+    end
+
+    if str:find("action|input\n|text|/dg (%d+)") then
+        local amount = str:match("action|input\n|text|/dg (%d+)")
+        local c = tonumber(amount)
+        
+        if c == 0 then
+            log("`4Drop Amount cannot be `00`4.")
+            return true
+        end
+        
+        if c > 250 then
+            log("`4Drop `cLimit exceeded`4. Max allowed is `0250`4.")
+            return true
+        end
+        
+
+        drop(11550, c)
+        local logtext = "\nadd_smalltext|`r[`3" .. os.date("%H:%M:%S") .. "`r] `4Dropped `0" .. c .. " `bBlack Gem Lock|left|"
+    
+        if not _G.droplog then
+            _G.droplog = ""
+        end
+        _G.droplog = logtext .. _G.droplog
+
+        if not _G.droplogImGui then
+            _G.droplogImGui = {}
+        end
+
+        local waktuDrop = os.date("%H:%M:%S")
+        local count = tostring(c)
+
+        table.insert(_G.droplogImGui, 1, {
+            waktu = waktuDrop,
+            drop = " Dropped ",
+            count = count,
+            item = " Black Gem Lock"
+        })
+
+        log("`4Dropped `0" .. c .. " `bBlack Gem Lock")
+        if dropchat then
+            send("`4Dropped `0" .. c .. " `bBlack Gem Lock")
+        end
+        return true
+    end
+
+    if str:find("/dbx3") then
+        local amount = str:match("/dbx3 (%d+)")
+        local c = tonumber(amount)
+    
+        if not c then
+            log("`4Invalid amount entered.`")
+            return true
+        end
+    
+        if c == 0 then
+            log("`4Drop Amount cannot be `00`4.")
+            return true
+        end
+    
+        if c > 250 then
+            log("`4Drop `cLimit exceeded`4. Max allowed is `0250`4.")
+            return true
+        end
+    
+        local total_drop = c * 3
+
+        drop(7188, total_drop)
+        local logtext = "\nadd_smalltext|`r[`3" .. os.date("%H:%M:%S") .. "`r] `4Dropped X3 `6[`c"..c.."`6] `0" .. total_drop .. " `eBlue Gem Lock|left|"
+    
+        if not _G.droplog then
+            _G.droplog = ""
+        end
+        _G.droplog = logtext .. _G.droplog
+
+        if not _G.DropXLogBlueGL then
+            _G.DropXLogBlueGL = {}
+        end
+
+        local waktuDrop = os.date("%H:%M:%S")
+        local count = tostring(c)
+
+        table.insert(_G.DropXLogBlueGL, 1, {
+            waktu = waktuDrop,
+            dropX = " Dropped X3 ",
+            symbol1 = "[",
+            count = count,
+            symbol2 = "] ",
+            totalCount = total_drop,
+            item = " Blue Gem lock"
+        })
+
+        log("`4Dropped X3 `0" .. total_drop .. " `eBlue Gem Lock")
+        if dropchat then
+            send("`4Dropped X3 `0" .. total_drop .. " `eBlue Gem Lock")
+        end
+    
+        return true
+    end
+
+    if str:find("/dbx4") then
+        local amount = str:match("/dbx4 (%d+)")
+        local c = tonumber(amount)
+    
+        if not c then
+            log("`4Invalid amount entered.`")
+            return true
+        end
+    
+        if c == 0 then
+            log("`4Drop Amount cannot be `00`4.")
+            return true
+        end
+    
+        if c > 250 then
+            log("`4Drop `cLimit exceeded`4. Max allowed is `0250`4.")
+            return true
+        end
+    
+        local total_drop = c * 4
+
+        drop(7188, total_drop)
+        local logtext = "\nadd_smalltext|`r[`3" .. os.date("%H:%M:%S") .. "`r] `4Dropped X4 `6[`c"..c.."`6] `0" .. total_drop .. " `eBlue Gem Lock|left|"
+    
+        if not _G.droplog then
+            _G.droplog = ""
+        end
+        _G.droplog = logtext .. _G.droplog
+
+        if not _G.DropXLogBlueGL then
+            _G.DropXLogBlueGL = {}
+        end
+
+        local waktuDrop = os.date("%H:%M:%S")
+        local count = tostring(c)
+
+        table.insert(_G.DropXLogBlueGL, 1, {
+            waktu = waktuDrop,
+            dropX = " Dropped X4 ",
+            symbol1 = "[",
+            count = count,
+            symbol2 = "] ",
+            totalCount = total_drop,
+            item = " Blue Gem lock"
+        })
+
+        log("`4Dropped X4 `0" .. total_drop .. " `eBlue Gem Lock")
+        if dropchat then
+            send("`4Dropped X4 `0" .. total_drop .. " `eBlue Gem Lock")
+        end
+    
+        return true
+    end
+
+    if str:find("/dbx5") then
+        local amount = str:match("/dbx5 (%d+)")
+        local c = tonumber(amount)
+    
+        if not c then
+            log("`4Invalid amount entered.`")
+            return true
+        end
+    
+        if c == 0 then
+            log("`4Drop Amount cannot be `00`4.")
+            return true
+        end
+    
+        if c > 250 then
+            log("`4Drop `cLimit exceeded`4. Max allowed is `0250`4.")
+            return true
+        end
+    
+        local total_drop = c * 5
+
+        drop(7188, total_drop)
+        local logtext = "\nadd_smalltext|`r[`3" .. os.date("%H:%M:%S") .. "`r] `4Dropped X5 `6[`c"..c.."`6] `0" .. total_drop .. " `eBlue Gem Lock|left|"
+        if not _G.droplog then
+            _G.droplog = ""
+        end
+        _G.droplog = logtext .. _G.droplog
+
+        if not _G.DropXLogBlueGL then
+            _G.DropXLogBlueGL = {}
+        end
+
+        local waktuDrop = os.date("%H:%M:%S")
+        local count = tostring(c)
+
+        table.insert(_G.DropXLogBlueGL, 1, {
+            waktu = waktuDrop,
+            dropX = " Dropped X5 ",
+            symbol1 = "[",
+            count = count,
+            symbol2 = "] ",
+            totalCount = total_drop,
+            item = " Blue Gem lock"
+        })
+
+        log("`4Dropped X5 `0" .. total_drop .. " `eBlue Gem Lock")
+        if dropchat then
+            send("`4Dropped X5 `0" .. total_drop .. " `eBlue Gem Lock")
+        end
+    
+        return true
+    end
+
+    if str:find("/dbx6") then
+        local amount = str:match("/dbx6 (%d+)")
+        local c = tonumber(amount)
+    
+        if not c then
+            log("`4Invalid amount entered.`")
+            return true
+        end
+    
+        if c == 0 then
+            log("`4Drop Amount cannot be `00`4.")
+            return true
+        end
+    
+        if c > 250 then
+            log("`4Drop `cLimit exceeded`4. Max allowed is `0250`4.")
+            return true
+        end
+    
+        local total_drop = c * 6
+
+        drop(7188, total_drop)
+        local logtext = "\nadd_smalltext|`r[`3" .. os.date("%H:%M:%S") .. "`r] `4Dropped X6 `6[`c"..c.."`6] `0" .. total_drop .. " `eBlue Gem Lock|left|"
+        if not _G.droplog then
+            _G.droplog = ""
+        end
+        _G.droplog = logtext .. _G.droplog
+
+        if not _G.DropXLogBlueGL then
+            _G.DropXLogBlueGL = {}
+        end
+
+        local waktuDrop = os.date("%H:%M:%S")
+        local count = tostring(c)
+
+        table.insert(_G.DropXLogBlueGL, 1, {
+            waktu = waktuDrop,
+            dropX = " Dropped X6 ",
+            symbol1 = "[",
+            count = count,
+            symbol2 = "] ",
+            totalCount = total_drop,
+            item = " Blue Gem lock"
+        })
+
+        log("`4Dropped X6 `0" .. total_drop .. " `eBlue Gem Lock")
+        if dropchat then
+            send("`4Dropped X6 `0" .. total_drop .. " `eBlue Gem Lock")
+        end
+    
+        return true
+    end
+
+    if str:find("/dbx7") then
+        local amount = str:match("/dbx7 (%d+)")
+        local c = tonumber(amount)
+    
+        if not c then
+            log("`4Invalid amount entered.`")
+            return true
+        end
+    
+        if c == 0 then
+            log("`4Drop Amount cannot be `00`4.")
+            return true
+        end
+    
+        if c > 250 then
+            log("`4Drop `cLimit exceeded`4. Max allowed is `0250`4.")
+            return true
+        end
+    
+        local total_drop = c * 7
+
+        drop(7188, total_drop)
+        local logtext = "\nadd_smalltext|`r[`3" .. os.date("%H:%M:%S") .. "`r] `4Dropped X7 `6[`c"..c.."`6] `0" .. total_drop .. " `eBlue Gem Lock|left|"
+        if not _G.droplog then
+            _G.droplog = ""
+        end
+        _G.droplog = logtext .. _G.droplog
+
+        if not _G.DropXLogBlueGL then
+            _G.DropXLogBlueGL = {}
+        end
+
+        local waktuDrop = os.date("%H:%M:%S")
+        local count = tostring(c)
+
+        table.insert(_G.DropXLogBlueGL, 1, {
+            waktu = waktuDrop,
+            dropX = " Dropped X7 ",
+            symbol1 = "[",
+            count = count,
+            symbol2 = "] ",
+            totalCount = total_drop,
+            item = " Blue Gem lock"
+        })
+
+        log("`4Dropped X7 `0" .. total_drop .. " `eBlue Gem Lock")
+        if dropchat then
+            send("`4Dropped X7 `0" .. total_drop .. " `eBlue Gem Lock")
+        end
+    
+        return true
+    end
+
+    if str:find("/bbx3") then
+        local amount = str:match("/bbx3 (%d+)")
+        local c = tonumber(amount)
+    
+        if not c then
+            log("`4Invalid amount entered.`")
+            return true
+        end
+    
+        if c == 0 then
+            log("`4Drop Amount cannot be `00`4.")
+            return true
+        end
+    
+        if c > 250 then
+            log("`4Drop `cLimit exceeded`4. Max allowed is `0250`4.")
+            return true
+        end
+    
+        local total_drop = c * 3
+
+        drop(11550, total_drop)
+        local logtext = "\nadd_smalltext|`r[`3" .. os.date("%H:%M:%S") .. "`r] `4Dropped X3 `6[`c"..c.."`6] `0" .. total_drop .. " `bBlack Gem Lock|left|"
+    
+        if not _G.droplog then
+            _G.droplog = ""
+        end
+        _G.droplog = logtext .. _G.droplog
+
+        if not _G.DropXLogBlackGL then
+            _G.DropXLogBlackGL = {}
+        end
+
+        local waktuDrop = os.date("%H:%M:%S")
+        local count = tostring(c)
+
+        table.insert(_G.DropXLogBlackGL, 1, {
+            waktu = waktuDrop,
+            dropX = " Dropped X3 ",
+            symbol1 = "[",
+            count = count,
+            symbol2 = "] ",
+            totalCount = total_drop,
+            item = " Black Gem Lock"
+        })
+
+        log("`4Dropped X3 `0" .. total_drop .. " `bBlack Gem Lock")
+        if dropchat then
+            send("`4Dropped X3 `0" .. total_drop .. " `bBlack Gem Lock")
+        end
+    
+        return true
+    end
+
+    if str:find("/bbx4") then
+        local amount = str:match("/bbx4 (%d+)")
+        local c = tonumber(amount)
+    
+        if not c then
+            log("`4Invalid amount entered.`")
+            return true
+        end
+    
+        if c == 0 then
+            log("`4Drop Amount cannot be `00`4.")
+            return true
+        end
+    
+        if c > 250 then
+            log("`4Drop `cLimit exceeded`4. Max allowed is `0250`4.")
+            return true
+        end
+    
+        local total_drop = c * 4
+
+        drop(11550, total_drop)
+        local logtext = "\nadd_smalltext|`r[`3" .. os.date("%H:%M:%S") .. "`r] `4Dropped X4 `6[`c"..c.."`6] `0" .. total_drop .. " `bBlack Gem Lock|left|"
+    
+        if not _G.droplog then
+            _G.droplog = ""
+        end
+        _G.droplog = logtext .. _G.droplog
+
+        if not _G.DropXLogBlackGL then
+            _G.DropXLogBlackGL = {}
+        end
+
+        local waktuDrop = os.date("%H:%M:%S")
+        local count = tostring(c)
+
+        table.insert(_G.DropXLogBlackGL, 1, {
+            waktu = waktuDrop,
+            dropX = " Dropped X4 ",
+            symbol1 = "[",
+            count = count,
+            symbol2 = "] ",
+            totalCount = total_drop,
+            item = " Black Gem Lock"
+        })
+
+        log("`4Dropped X4 `0" .. total_drop .. " `bBlack Gem Lock")
+        if dropchat then
+            send("`4Dropped X4 `0" .. total_drop .. " `bBlack Gem Lock")
+        end
+    
+        return true
+    end
+    
+    if str:find("/reme") then
+        rememode = not rememode
+        local status = ""..(rememode and "`2Enable" or "`4Disable")
+        qememode = false
+        lememode = false
+        log("Reme Mode "..status)
+        overlay("Reme Mode "..status)
+        return true
+    end
+
+    if str:find("/qeme") then
+        qememode = not qememode
+        local status = ""..(qememode and "`2Enable" or "`4Disable")
+        rememode = false
+        lememode = false
+        log("Qeme Mode "..status)
+        overlay("Qeme Mode "..status)
+        return true
+    end
+
+    if str:find("/leme") then
+        lememode = not lememode
+        local status = ""..(lememode and "`2Enable" or "`4Disable")
+        rememode = false
+        qememode = false
+        log("Leme Mode "..status)
+        overlay("Leme Mode "..status)
+        return true
+    end
+
+    if str:find("/blue") then
+        local blackGemLockID = 11550
+    
+        if inv(blackGemLockID) >= 1 then
+            SendPacket(2, "action|dialog_return\ndialog_name|info_box\nbuttonClicked|make_bluegl")
+            log("`2Converted `51 `bBlack Gem Lock `9to `5100 `eBlue Gem Locks")
+        else
+            log("`4Not enough `bBlack Gem Locks `4for conversion!")
+            end
+            return true
+    end
+    
+    if str:find("/black") or str:find("/irenk") then
+        local blueGemLock = inv(7188)
+        if blueGemLock >= 100 then
+            SendPacket(2, "action|dialog_return\ndialog_name|info_box\nbuttonClicked|make_bgl")
+            log("`2Converted `5100 `eBlue Gem Locks `9to `51 `bBlack Gem Lock")
+        else
+            log("`4Not enough `eBlue Gem Locks `4for conversion!")
+        end
+        return true
+    end
+    
+    if str:find("/wd (%d+)") then
+        WdBgl = str:match("/wd (%d+)")
+        SendPacket(2, "action|dialog_return\ndialog_name|bank_withdraw\nbgl_count|"..WdBgl)
+        return true
+    end
+    
+    if str:find("/depo (%d+)") or str:find("/dp (%d+)") then
+        DpBgl = str:match("/depo (%d+)") or str:match("/dp (%d+)")
+        SendPacket(2, "action|dialog_return\ndialog_name|bank_deposit\nbgl_count|"..DpBgl)
+        return true
+    end
+
+    return false
+end)
+
+function wrench_mode(type, str)
+     if str:find("/pmodal") then
+        pmodal = not pmodal
+        pbmodal = fasle
+        wrenchpull = false
+        wrenchkick = false
+        wrenchban = false
+        wrenchdefault = false
+        local status = "" .. (pmodal and "`2Enable" or "`4Disable")
+        overlay("Show Player Modal "..status)
+        log("Show Player Modal "..status)
+        return true
+    end
+
+    if str:find("/pbmodal") then
+        pbmodal = not pbmodal
+        pmodal = false
+        wrenchpull = false
+        wrenchkick = false
+        wrenchban = false
+        wrenchdefault = false
+        local status = "" .. (pbmodal and "`2Enable" or "`4Disable")
+        overlay("Show Modal BGL + Pull Player "..status)
+        log("Show Modal BGL + Pull Player "..status)
+        return true
+    end
+
+    if str:find("buttonClicked|pullmode") or str:find("buttonClicked|kickmode") or
+        str:find("buttonClicked|banmode") or str:find("buttonClicked|defaultmode") or str:find("/w pull") or str:find("/w kick") or 
+        str:find("/w ban") or str:find("/w off") then
+
+            local logMessage, modeChanged, modeDis = "", "", ""
+
+            if str:find("pullmode") or str:find("/w pull") then
+                if wrenchpull then
+                    logMessage = "Pull mode is already active!"
+                else
+                    wrenchpull = true
+                    wrenchkick = false
+                    wrenchban = false
+                    pmodal = false
+                    wrenchdefault = false
+                    modeChanged = "pull"
+                end
+            elseif str:find("kickmode") or str:find("/w kick") then
+                if wrenchkick then
+                    logMessage = "Kick mode is already active!"
+                else
+                    wrenchpull = false
+                    wrenchkick = true
+                    wrenchban = false
+                    pmodal = false
+                    wrenchdefault = false
+                    modeChanged = "kick"
+                end
+            elseif str:find("banmode") or str:find("/w ban") then
+                if wrenchban then
+                    logMessage = "Ban mode is already active!"
+                else
+                    wrenchpull = false
+                    wrenchkick = false
+                    wrenchban = true
+                    pmodal = false
+                    wrenchdefault = false
+                    modeChanged = "ban"
+                end
+            elseif str:find("defaultmode") or str:find("/w off") then
+                wrenchpull = false
+                wrenchkick = false
+                wrenchban = false
+                pmodal = false
+                wrenchdefault = true
+                modeDis = "wrenchdefault"
+            end
+
+            if logMessage ~= "" then
+                overlay(logMessage)
+                log(logMessage)
+                if str:find("buttonClicked") then
+                    wrench()
+                elseif str:find("/w pull") or str:find("/w kick") or str:find("/w ban") or str:find("/w off") then
+                    return true
+                end
+            end
+
+            if modeChanged ~= "" then
+                overlay("Wrench mode : `2" .. modeChanged)
+                if str:find("buttonClicked") then wrench() end
+                return true
+            end
+
+            if modeDis ~= "" then
+                log("Wrench mode is now to `6default")
+                if str:find("buttonClicked") then wrench() end
+                return true
+            end
+        end
+
+    function isAdminOrOwner(uid)
+        for _, tile in pairs(GetTiles()) do
+            if tile.extra then
+                if tile.extra.owner == uid then
+                    return true
+                end
+                if tile.extra.admin then
+                    for _, admin in pairs(tile.extra.admin) do
+                        if admin == uid then
+                            return true
+                        end
+                    end
+                end
+            end
+        end
+        return false
+    end
+    
+    id = nil
+
+    if str:find("action|wrench\n|netid|(%d+)") then
+        local id = tonumber(str:match("action|wrench\n|netid|(%d+)"))
+        if id == GetLocal().netid then
+            SendPacket(2, "action|wrench\n|netid|" .. id)
+            return true
+        end
+
+        if wrenchkick or wrenchpull or wrenchban then
+            if not isAdminOrOwner(GetLocal().userid) then
+                LogToConsole("`4You can't pull because you are not an Admin/Owner in this world.")
+                return true
+            end
+
+            if wrenchkick == true then
+                SendPacket(2, "action|dialog_return\ndialog_name|popup\nnetID|" .. id .. "|\nbuttonClicked|kick")
+                return true
+            elseif wrenchpull == true then
+                SendPacket(2, "action|dialog_return\ndialog_name|popup\nnetID|" .. id .. "|\nbuttonClicked|pull")
+                SendPacket(2, "action|input\n|text|" .. PlayerName(id) .. " `cGAS WAK?")
+                return true
+            elseif wrenchban == true then
+                SendPacket(2, "action|dialog_return\ndialog_name|popup\nnetID|" .. id .. "|\nbuttonClicked|world_ban")
+                return true
+            end
+            return false
+        end
+    end
+
+    if str:find("action|wrench\n|netid|(%d+)") then
+        id = tonumber(str:match("action|wrench\n|netid|(%d+)"))
+        if id == GetLocal().netid then
+            SendPacket(2, "action|wrench\n|netid|" .. id)
+            return true
+        elseif pmodal == true then
+            SendPacket(2, "action|dialog_return\ndialog_name|popup\nnetID|" .. id .. "|\nbuttonClicked|viewinv")
+            return false
+        end
+    end
+    
+     if str:find("action|wrench\n|netid|(%d+)") then
+        id = tonumber(str:match("action|wrench\n|netid|(%d+)"))
+        if id == GetLocal().netid then
+            SendPacket(2, "action|wrench\n|netid|" .. id)
+            return true
+        elseif pbmodal == true then
+            PullDelayViewInv = true
+            return false
+        end
+    end
+
+    return false
+end
+AddHook("onsendpacket", "wrench_command", wrench_mode)
+
+AddHook("onvariant", "variantList", function(var)
+
+    if var[0]:find("OnConsoleMessage") and var[1]:find("You merged") then
+        return true
+    end
+
+    if var[0]:find("OnConsoleMessage") and var[1]:find("World Locked") then
+        send("`1P`3R`5O`#X`1Y `3B`5Y `#A`1N`3O`5M`#A`1L`3I")
+        return true
+    end      
+
+    if var[0]:find("OnConsoleMessage") and var[1]:find("New custom skin applied.") then
+        return true
+    end
+
+    if var[0]:find("OnTalkBubble") and var[2]:find("New custom skin applied.") then
+        return true
+    end
+
+    if pbmodal == true or pmodal == true then
+        if var[0]:find("OnDialogRequest") then
+            if var[1]:find("end_dialog|profileinfo|Close||") then
+                local dialog = var[1]
+                local result = {}
+
+                local function extract_amount(name)
+                    local pattern = "|`%$" .. name .. "``|.-|.-|(%d+)|"
+                    local amount = dialog:match(pattern)
+                    return tonumber(amount) or 0
+                end
+
+                if pbmodal then
+                    result["Blue Gem Lock"] = extract_amount("Blue Gem Lock")
+                    result["Black Gem Lock"] = extract_amount("Black Gem Lock")
+                end
+                if pmodal then
+                    result["World Lock"] = extract_amount("World Lock")
+                    result["Diamond Lock"] = extract_amount("Diamond Lock")
+                    result["Blue Gem Lock"] = extract_amount("Blue Gem Lock")
+                    result["Black Gem Lock"] = extract_amount("Black Gem Lock")
+                end
+
+                local hasLocks = false
+                for _, amount in pairs(result) do
+                    if amount > 0 then
+                        hasLocks = true
+                        break
+                    end
+                end
+
+                for _, player in pairs(GetPlayerList()) do
+                    if player.netid ~= GetLocal().netid then
+                        if hasLocks then
+                            if pbmodal then
+                                send("`#" .. player.name .. " Modal > `eBGL: `5" ..
+                                    result["Blue Gem Lock"] .. " `bBGL: `5" .. result["Black Gem Lock"])
+                            elseif pmodal then
+                                send("`#" .. player.name .. " Modal > `9WL: `5" .. result["World Lock"] ..
+                                    " `3DL: `5" .. result["Diamond Lock"] .. " `eBGL: `5" ..
+                                    result["Blue Gem Lock"] .. " `bBGL: `5" .. result["Black Gem Lock"])
+                            end
+                        else
+                            overlay(player.name .. " `4does not `9have any locks in the `5inventory")
+                        end
+                    end
+                end
+
+                return true
+            elseif var[1]:find("end_dialog|popup|||") then
+                return true
+            end
+        end
+    end
+
+
+
+    if var[0]:find("OnConsoleMessage") and var[1]:find("Collected") then
+        -- World Lock
+        if var[1]:find("(%d+) World Lock") then
+            local count = tonumber(var[1]:match("(%d+) World Lock"))
+            if count then
+                log("`2Collected `0" .. count .. " `9World Locks")
+                local logtext = "\nadd_smalltext|`r[`3" .. os.date("%H:%M:%S") .. "`r] `2Collected `0" .. count .. " `9World Locks|left|"
+                _G.collectlog = (logtext .. (_G.collectlog or ""))
+                if collectchat then
+                    send("`2Collected `0" .. count .. " `9World Locks")
+                end
+                return true
+            end
+        end
+    
+        -- Diamond Lock
+        if var[1]:find("(%d+) Diamond Lock") then
+            local count = tonumber(var[1]:match("(%d+) Diamond Lock"))
+            if count then
+                log("`2Collected `0" .. count .. " `3Diamond Locks")
+                local logtext = "\nadd_smalltext|`r[`3" .. os.date("%H:%M:%S") .. "`r] `2Collected `0" .. count .. " `3Diamond Locks|left|"
+                _G.collectlog = (logtext .. (_G.collectlog or ""))
+                if collectchat then
+                    send("`2Collected `0" .. count .. " `3Diamond Locks")
+                end
+                return true
+            end
+        end
+    
+        -- Blue Gem Lock
+        if var[1]:find("(%d+) Blue Gem Lock") then
+            local count = tonumber(var[1]:match("(%d+) Blue Gem Lock"))
+            if count then
+                log("`2Collected `0" .. count .. " `eBlue Gem Locks")
+                local logtext = "\nadd_smalltext|`r[`3" .. os.date("%H:%M:%S") .. "`r] `2Collected `0" .. count .. " `eBlue Gem Locks|left|"
+                _G.collectlog = (logtext .. (_G.collectlog or ""))
+                if collectchat then
+                    send("`2Collected `0" .. count .. " `eBlue Gem Locks")
+                end
+                return true
+            end
+        end
+    
+        -- Black Gem Lock
+        if var[1]:find("(%d+) Black Gem Lock") then
+            local count = tonumber(var[1]:match("(%d+) Black Gem Lock"))
+            if count then
+                log("`2Collected `0" .. count .. " `bBlack Gem Locks")
+                local logtext = "\nadd_smalltext|`r[`3" .. os.date("%H:%M:%S") .. "`r] `2Collected `0" .. count .. " `bBlack Gem Locks|left|"
+                _G.collectlog = (logtext .. (_G.collectlog or ""))
+                if collectchat then
+                    send("`2Collected `0" .. count .. " `bBlack Gem Locks")
+                end
+                return true
+            end
+        end
+    end   
+
+    if var[0] == "OnTalkBubble" and var[2]:find("spun the wheel and got") and var[2]:find("``") then
+        local cleaned_text = remove_color_codes(var[2])
+        local spin = cleaned_text:match("spun the wheel and got (%d+)")
+        local name = var[2]:match("%[(.-) spun the wheel and got")
+        local message = ""
+    
+        if spin and name then
+            name = name:gsub("%s+", "")
+    
+            local qq_number = qq_function(spin)
+            local reme_number = reme_function(spin)
+            local leme_number = leme_function(spin)
+    
+            message = "`2[REAL] `5[" .. name .. " `0spun the wheel and got " .. getColor(spin) .. spin .. "`0!`5]"
+    
+            if rememode and not qememode and not lememode and reme_number then
+                message = message .. " `cREME : `9" .. reme_number
+            elseif not rememode and qememode and not lememode and qq_number then
+                message = message .. " `cQEME : `9" .. qq_number
+            elseif not rememode and not qememode and lememode and leme_number then
+                message = message .. " `cLEME : `9" .. leme_number
+            end
+        else
+            local name_detect_fake = var[2]:match("%[(.-) spun the wheel and got")
+            name_detect_fake = name_detect_fake and name_detect_fake:gsub("%s+", "") or "Unknown"
+
+            local fake_message_raw = var[2]
+                :gsub("`[%d%l]*%[FAKE%]%s*", "")
+                :gsub("spun the wheel and got %d+!", "")
+                :gsub("got %d+", "got")
+                :gsub("!", "")
+                :gsub("``", "")
+
+            local fake_message_cleaned = fake_message_raw:gsub("%s+", "")
+            spin = spin or "?"
+
+            message = "`4[FAKE] `5[`0" .. fake_message_cleaned .. " `0spun the wheel and got " .. getColor(spin) .. spin .. "`0!`5]"
+        end
+    
+        SendVariantList({
+            [0] = var[0],
+            [1] = var[1],
+            [2] = message,
+            [3] = var[3]
+        })
+    
+        local logtext = "\nadd_smalltext|`r[`3" .. os.date("%H:%M:%S") .. "`r] " .. message .. "|left|"
+        _G.spinlog = logtext .. (_G.spinlog or "")
+    
+        return true
+    end    
+    
+    if var[0] == "OnConsoleMessage" and var[1]:find("spun the wheel and got") then
+        local number = remove_color_codes(var[1])
+        local spin = number:match("spun the wheel and got (%d+)")
+    
+        local function clean_name(raw_name)
+            raw_name = raw_name:gsub("%s*%(%d+%)%s*", "")
+            raw_name = raw_name:gsub("%s+$", "")
+            raw_name = raw_name:gsub("^%s+", "")
+            return raw_name
+        end
+
+        local function clean_name_webhook(raw_name)
+            local content = raw_name:match("<(.-)>") or raw_name
+            local cleaned = content:gsub("[^A-Za-z]", "")
+            cleaned = cleaned:match("^%s*(.-)%s*$")
+        
+            return cleaned
+        end
+
+        local function clean_text_webhook(raw_text)
+            raw_text = raw_text:gsub("^[^<]*<.*>", "")
+            raw_text = raw_text:gsub("`", "")
+            raw_text = raw_text:gsub("^%$", "")
+            raw_text = raw_text:gsub("%$(%w+) spun the wheel and got.-%[FAKE%]", "%1")
+            raw_text = raw_text:match("^%s*(.-)%s*$")
+        
+            return raw_text
+        end
+
+        local name = var[1]:match("%[(.-)%] spun the wheel and got") or var[1]:match("%[(.-) spun the wheel and got")
+        if name then
+            name = clean_name(name)
+        end
+    
+        local fakespin = var[1]:find("<") and var[1]:find(">") and var[1]:match("<(.+)>") ~= nil
+        if fakespin then
+            name = var[1]:match("<(.+)>") or name
+            if name then
+                name = clean_name(name)
+                name_webhook = clean_name_webhook(name)
+
+                local cleaned_text = clean_text_webhook(var[1])
+                
+                local payloadFake = [[
+                {
+                    "content": null,
+                    "embeds": [
+                        {
+                            "description": "# <:Roulette:1369590598780321812> Detected Typing",
+                            "color": 16711680,
+                            "fields": [
+                                {
+                                    "name": "📊 Player:",
+                                    "value": "**<:rightarrow:1366771662476804096> ]] .. removeColorAndSymbols(name_webhook) .. [[**"
+                                },
+                                {
+                                    "name": "🌍 World Player Use Typing Spun:",
+                                    "value": "**<:rightarrow:1366771662476804096> ]] .. GetWorld().name .. [[**"
+                                },
+                                { 
+                                    "name": "📜 type Spun:",
+                                    "value": "**<:rightarrow:1366771662476804096> ]] .. cleaned_text .. [[**",
+                                    "inline": true
+                                },
+                                { 
+                                    "name": "📜 Text Spun:",
+                                    "value": "**<:rightarrow:1366771662476804096> spun the wheel and got ]] .. spin .. [[!**",
+                                    "inline": true
+                                }
+                            ]
+                        }
+                    ],
+                    "attachments": []
+                }
+                ]]
+            
+                SendWebhook(WebHookFake, payloadFake)
+            end
+        end
+    
+        local qq_number = qq_function(spin)
+        local reme_number = reme_function(spin)
+        local leme_number = leme_function(spin)
+    
+        local message = systemNAme .. " `2[REAL] `5[" .. name .. " `0spun the wheel and got " .. getColor(spin) .. spin .. "`0!`5]"
+
+        if fakespin then
+            message = systemNAme .. " `4[FAKE] `5[" .. name .. " `0spun the wheel and got " .. getColor(spin) .. spin .. "`0!`5]"
+        else
+            if rememode and not qememode and not lememode and reme_number then
+                message = message .. " `cREME : `9" .. reme_number
+            elseif not rememode and qememode and not lememode and qq_number then
+                message = message .. " `cQEME : `9" .. qq_number
+            elseif not rememode and not qememode and lememode then
+                message = message .. " `cLEME : `9" .. leme_number
+            end
+        end
+    
+        SendVariantList({
+            [0] = var[0],
+            [1] = message:gsub("", ""),
+            [2] = var[2]
+        })
+    
+        return true
+    end      
+
+    if var[0]:find("OnSDBroadcast") then
+        if sdb then
+            overlay("`4Super Duper Boardcast BLOCKED!!")
+        end
+        return true
+    end
+    
+    if var[0] == "OnDialogRequest" then
+	    if var[1]:find("Telephone") then
+	        local telX = var[1]:match("embed_data|x|(%d+)")
+	        local telY = var[1]:match("embed_data|y|(%d+)")
+	
+	        if telX and telY then
+	            if cbgl then
+	                SendPacket(2, "action|dialog_return\ndialog_name|telephone\nnum|53785|\nx|" .. telX .. "|\ny|" .. telY .. "|\nbuttonClicked|bglconvert")
+	            elseif champ then
+	                SendPacket(2, "action|dialog_return\ndialog_name|telephone\nnum|53785|\nx|" .. telX .. "|\ny|" .. telY .. "|\nbuttonClicked|getchamp")
+	            end
+	        end
+	
+	        return true
+	    end
+	
+	    if cbgl and var[1]:find("Wow, that's fast delivery.") then
+	        return true
+	    end
+	
+	    if champ and var[1]:find("One Champagne Bottle costs") then
+	        return true
+	    end
+	end
+
+    if var[0]:find("OnConsoleMessage") then
+        log(var[1])
+        return true
+    end
+
+    return false
+end)
+else
+
+end
+
+
+
+
+while true do
+    if PullDelayViewInv and id then
+        SendPacket(2, "action|dialog_return\ndialog_name|popup\nnetID|" .. id .. "|\nbuttonClicked|viewinv")
+        Sleep(130)
+        SendPacket(2, "action|dialog_return\ndialog_name|popup\nnetID|" .. id .. "|\nbuttonClicked|pull")
+        PullDelayViewInv = false
+    end
+    Sleep(208)
+end
