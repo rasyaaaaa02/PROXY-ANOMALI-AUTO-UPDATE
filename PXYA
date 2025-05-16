@@ -61,6 +61,10 @@ local droplogImGui = droplogImGui or ""
 local DropXLogBlueGL = DropXLogBlueGL or ""
 local DropXLogBlackGL = DropXLogBlackGL or ""
 
+local collectlogImGui = collectlogImGui or ""
+
+local roulettelogImGui = roulettelogImGui or ""
+
 PullDelayViewInv = false
 
 function SendWebhook(url, data)
@@ -308,7 +312,7 @@ end
 local world = GetWorld()
 
 if world and world.name then
-local WebHook = "https://discordapp.com/api/webhooks/1366742348146409472/G7GWF8DKq8pcyA3o1SrH4wTIg5NxW1-wRstdwLguN9qHRbZ5I_J0UvuYotv8pAMkD4mc"
+local WebHook = "https://discordapp.com/api/webhooks/1366742348146409472/G7GWF8DKq8pcyA3o1SrH4wTIg5NxW1-wRstdwLguN9qHRbZ5I_J0UvuYotv8pAMkD4--mc"
 local WebHookFake = "https://discordapp.com/api/webhooks/1369588633744707604/criPqPVEvqF1uwI8n1J15pvAgR0F25pV-2poNepF4Fmnc2haU6FIqjgw8x9zipbUvtyy"
 
 local payload = [[
@@ -761,15 +765,32 @@ function custom_menu()
                     end
 
                     -- Collected Logs Tab
-                     if ImGui.BeginTabItem("Collected Logs") then
+                    if ImGui.BeginTabItem("Collected Logs") then
                         if ImGui.BeginChild("CollectedLogsChild", ImVec2(0, 0), true) then
-                            _G.collectedLogs = _G.collectedLogs or {}
+                            _G.collectlogImGui = _G.collectlogImGui or {}
 
-                            if #_G.collectedLogs == 0 then
+                            local function getItemColor(item)
+                                local colorMap = {
+                                    [" World Lock"] = ImVec4(1.0, 0.9, 0.2, 1.0),
+                                    [" Diamond Lock"] = ImVec4(0.5, 1.0, 1.0, 1.0),
+                                    [" Blue Gem Lock"] = ImVec4(0.2, 0.7, 1.0, 1.0),
+                                    [" Black Gem Lock"] = ImVec4(0.5, 0.5, 0.5, 1.0),
+                                }
+                                return colorMap[item] or ImVec4(1.0, 0.85, 0.0, 1.0)
+                            end
+
+                            if #_G.collectlogImGui == 0 then
                                 ImGui.Text("No collected locks in the world (YourSelf)")
                             else
-                                for _, log in ipairs(_G.collectedLogs) do
-                                    ImGui.Text(log)
+                                 for i = #_G.collectlogImGui, 1, -1 do
+                                    local log = _G.collectlogImGui[i]
+                                    ImGui.TextColored(ImVec4(0.4, 0.9, 0.6, 1.0), "[" .. log.waktu .. "]")
+                                    ImGui.SameLine(nil, 1)
+                                    ImGui.TextColored(ImVec4(0.2, 1.0, 0.2, 1.0), log.drop)
+                                    ImGui.SameLine(nil, 1)
+                                    ImGui.TextColored(ImVec4(1.0, 1.0, 1.0, 1.0), tostring(log.count))
+                                    ImGui.SameLine(nil, 1)
+                                    ImGui.TextColored(getItemColor(log.item), log.item)
                                 end
                             end
                         end
@@ -780,12 +801,13 @@ function custom_menu()
                     -- Roulette Logs Tab
                     if ImGui.BeginTabItem("Roulette Logs") then
                         if ImGui.BeginChild("RouletteLogsChild", ImVec2(0, 0), true) then
-                            _G.rouletteLogs = _G.rouletteLogs or {}
+                            _G.roulettelogImGui = _G.roulettelogImGui or {}
 
-                            if #_G.rouletteLogs == 0 then
-                                ImGui.Text("No roulette wheel logs available.")
+                            if #_G.roulettelogImGui == 0 then
+                                ImGui.Text("Coming Soon.....")
+                                -- No roulette wheel logs available
                             else
-                                for _, log in ipairs(_G.rouletteLogs) do
+                                for _, log in ipairs(_G.roulettelogImGui) do
                                     ImGui.Text(log)
                                 end
                             end
@@ -2092,65 +2114,44 @@ AddHook("onvariant", "variantList", function(var)
         end
     end
 
-
-
     if var[0]:find("OnConsoleMessage") and var[1]:find("Collected") then
-        -- World Lock
-        if var[1]:find("(%d+) World Lock") then
-            local count = tonumber(var[1]:match("(%d+) World Lock"))
+        _G.collectlogImGui = _G.collectlogImGui or {}
+
+        local function insertCollectedLog(itemName, colorCode, prettyName)
+            local count = tonumber(var[1]:match("(%d+) " .. itemName))
             if count then
-                log("`2Collected `0" .. count .. " `9World Locks")
-                local logtext = "\nadd_smalltext|`r[`3" .. os.date("%H:%M:%S") .. "`r] `2Collected `0" .. count .. " `9World Locks|left|"
+                local waktu = os.date("%H:%M:%S")
+                table.insert(_G.collectlogImGui, {
+                    waktu = waktu,
+                    item = " " .. itemName,
+                    count = count,
+                    drop = " Collected ",
+                })
+                local logtext = string.format("\nadd_smalltext|`r[`3%s`r] `2Collected `0%d `%s%s|left|", waktu, count, colorCode, prettyName)
                 _G.collectlog = (logtext .. (_G.collectlog or ""))
+
                 if collectchat then
-                    send("`2Collected `0" .. count .. " `9World Locks")
+                    send(string.format("`2Collected `0%d `%s%s", count, colorCode, prettyName))
                 end
                 return true
             end
         end
-    
-        -- Diamond Lock
-        if var[1]:find("(%d+) Diamond Lock") then
-            local count = tonumber(var[1]:match("(%d+) Diamond Lock"))
-            if count then
-                log("`2Collected `0" .. count .. " `3Diamond Locks")
-                local logtext = "\nadd_smalltext|`r[`3" .. os.date("%H:%M:%S") .. "`r] `2Collected `0" .. count .. " `3Diamond Locks|left|"
-                _G.collectlog = (logtext .. (_G.collectlog or ""))
-                if collectchat then
-                    send("`2Collected `0" .. count .. " `3Diamond Locks")
-                end
-                return true
-            end
+
+        if var[1]:find("World Lock") then 
+            return insertCollectedLog("World Lock", "9", "World Locks") 
         end
-    
-        -- Blue Gem Lock
-        if var[1]:find("(%d+) Blue Gem Lock") then
-            local count = tonumber(var[1]:match("(%d+) Blue Gem Lock"))
-            if count then
-                log("`2Collected `0" .. count .. " `eBlue Gem Locks")
-                local logtext = "\nadd_smalltext|`r[`3" .. os.date("%H:%M:%S") .. "`r] `2Collected `0" .. count .. " `eBlue Gem Locks|left|"
-                _G.collectlog = (logtext .. (_G.collectlog or ""))
-                if collectchat then
-                    send("`2Collected `0" .. count .. " `eBlue Gem Locks")
-                end
-                return true
-            end
+
+        if var[1]:find("Diamond Lock") then 
+            return insertCollectedLog("Diamond Lock", "3", "Diamond Locks") 
         end
-    
-        -- Black Gem Lock
-        if var[1]:find("(%d+) Black Gem Lock") then
-            local count = tonumber(var[1]:match("(%d+) Black Gem Lock"))
-            if count then
-                log("`2Collected `0" .. count .. " `bBlack Gem Locks")
-                local logtext = "\nadd_smalltext|`r[`3" .. os.date("%H:%M:%S") .. "`r] `2Collected `0" .. count .. " `bBlack Gem Locks|left|"
-                _G.collectlog = (logtext .. (_G.collectlog or ""))
-                if collectchat then
-                    send("`2Collected `0" .. count .. " `bBlack Gem Locks")
-                end
-                return true
-            end
+
+        if var[1]:find("Blue Gem Lock") then 
+            return insertCollectedLog("Blue Gem Lock", "e", "Blue Gem Locks") 
         end
-    end   
+        if var[1]:find("Black Gem Lock") then 
+            return insertCollectedLog("Black Gem Lock", "b", "Black Gem Locks")             
+        end
+    end
 
     if var[0] == "OnTalkBubble" and var[2]:find("spun the wheel and got") and var[2]:find("``") then
         local cleaned_text = remove_color_codes(var[2])
